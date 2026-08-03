@@ -10,8 +10,8 @@ use std::ptr::{null, null_mut};
 use std::time::SystemTime;
 
 use crate::ffi::{
-    vrt_ctx, vsa_suckaddr_len, VclEvent, VfpStatus, VCL_BACKEND, VCL_BOOL, VCL_IP, VCL_TIME,
-    VCL_VCL, VRT_CTX_MAGIC,
+    vrt_ctx, vsa_suckaddr_len, VclEvent, VfpStatus, VCL_BACKEND, VCL_BOOL, VCL_IP, VCL_PROBE,
+    VCL_TIME, VCL_VCL, VRT_CTX_MAGIC,
 };
 #[cfg(varnishsys_90_sslflags)]
 use crate::ffi::{BSSL_F_ENABLE, BSSL_F_NOVERIFY, BSSL_F_VERIFY_HOST};
@@ -368,6 +368,7 @@ pub struct NativeBackendBuilder<'a> {
     backend_wait_limit: Option<u32>,
     #[cfg(varnishsys_90_sslflags)]
     sslflags: c_uint,
+    probe: Option<&'a VCL_PROBE>,
 }
 
 /// Macro to generate builder setter methods
@@ -399,6 +400,7 @@ impl<'a> NativeBackendBuilder<'a> {
             backend_wait_limit: None,
             #[cfg(varnishsys_90_sslflags)]
             sslflags: 0,
+            probe: None,
         }
     }
 
@@ -418,6 +420,7 @@ impl<'a> NativeBackendBuilder<'a> {
             backend_wait_limit: None,
             #[cfg(varnishsys_90_sslflags)]
             sslflags: 0,
+            probe: None,
         }
     }
 
@@ -478,6 +481,8 @@ impl<'a> NativeBackendBuilder<'a> {
         "Set the Host header to use sending a request that doesn't have a
         `Host` header. "
     );
+
+    builder_setter!(probe, &'a VCL_PROBE, "Set the probe for health checks.");
 
     /// Use the `PROXY` protocol v1 to connect to the backend.
     #[must_use]
@@ -603,7 +608,10 @@ impl<'a> NativeBackendBuilder<'a> {
             max_connections: self.max_connections.unwrap_or(0),
             proxy_header: self.proxy_header.unwrap_or(0),
             backend_wait_limit: self.backend_wait_limit.unwrap_or(0),
-            probe: ffi::VCL_PROBE(null()),
+            probe: match self.probe {
+                None => VCL_PROBE(null()),
+                Some(p) => p.to_owned(),
+            },
         });
 
         let bep = ffi::VRT_new_backend(
