@@ -31,3 +31,16 @@ set req.backend_hint = native_backend.create("${server_addr}:${server_port}");
 
 * `[STRING addr]`:
 Socket address string (e.g., "127.0.0.1:8080")
+
+## Object `DynamicBackend`
+
+### Constructor `native_backend.new(STRING addr, [PROBE probe])`
+
+Create a backend with an optional probe attached from a socket address.
+
+This function demonstrates creating native backends at initalization.
+The backend is for the VCL lifetime and can be reused..
+
+### Method `BACKEND <object>.backend()`
+
+Retrieve the configured native backend.

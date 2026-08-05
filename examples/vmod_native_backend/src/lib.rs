@@ -1,11 +1,67 @@
+use varnish::vcl::BackendRef;
+
 varnish::run_vtc_tests!("tests/*.vtc");
+
+pub struct DynamicBackend {
+    /// A native backend created alongside this `DynamicBackend`.
+    backend: BackendRef,
+}
 
 #[varnish::vmod(docs = "README.md")]
 mod native_backend {
+    use super::DynamicBackend;
     use std::net::SocketAddr;
+    use std::ptr::null;
+    use varnish::ffi;
     use varnish::vcl::Ctx;
+    use varnish::vcl::IntoVCL;
     use varnish::vcl::NativeBackendBuilder;
+    use varnish::vcl::Probe;
     use varnish::vcl::{BackendRef, NativeBackend};
+
+    impl DynamicBackend {
+        /// Create a backend with an optional probe attached from a socket address.
+        ///
+        /// This function demonstrates creating native backends at initalization.
+        /// The backend is for the VCL lifetime and can be reused..
+        pub fn new(
+            ctx: &mut Ctx,
+            #[vcl_name] vcl_name: &str,
+            addr: &str,
+            probe: Option<Probe>,
+        ) -> Result<Self, &'static str> {
+            let Ok(sock_addr) = addr.parse() else {
+                return Err("failed to parse addr");
+            };
+
+            // Create backend name from address
+            let name = format!("{vcl_name}_{sock_addr}");
+            let Ok(name_cstr) = std::ffi::CString::new(name) else {
+                return Err("failed to create native name");
+            };
+
+            let native_backend_probe = match probe {
+                None => ffi::VCL_PROBE(null()),
+                Some(probe) => probe.into_vcl(&mut ctx.ws).expect("no workspace left"),
+            };
+
+            let Ok(native_backend) = NativeBackendBuilder::new_ip(&name_cstr, sock_addr)
+                .probe(&native_backend_probe)
+                .build(ctx)
+            else {
+                return Err("failed to build native backend");
+            };
+
+            let backend = native_backend.as_ref().clone();
+
+            Ok(Self { backend })
+        }
+
+        /// Retrieve the configured native backend.
+        pub fn backend(&self) -> BackendRef {
+            self.backend.clone()
+        }
+    }
 
     /// Create a dynamic backend from a socket address.
     ///
