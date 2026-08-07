@@ -49,12 +49,14 @@ mod native_backend {
                 .probe(&native_backend_probe)
                 .build(ctx)
             else {
-                return Err("failed to build native backend");
+                return Err("failed to create native backend");
             };
 
-            let backend = native_backend.as_ref().clone();
+            let native_backend_ref = native_backend.as_ref();
 
-            Ok(Self { backend })
+            Ok(Self {
+                backend: native_backend_ref.clone(),
+            })
         }
 
         /// Retrieve the configured native backend.
