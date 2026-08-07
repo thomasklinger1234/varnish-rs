@@ -1,0 +1,41 @@
+varnishtest "Test dynamic backend health probe (intentionally sick)"
+
+server s1 {
+    rxreq
+    txresp
+} -start
+
+varnish v1 -vcl {
+    import native_backend from "${vmod}";
+
+    backend default none;
+
+    probe p1 {
+        .initial = 0;
+        .threshold = 64;
+        .url = "/";
+        .expected_response = 599;
+    }
+
+    sub vcl_init {
+        new be1 = native_backend.new("${s1_addr}:${s1_port}", probe=p1);
+    }
+
+    sub vcl_recv {
+        set req.backend_hint = be1.backend();
+        return(pass);
+    }
+} -start
+
+
+client c1 {
+    txreq -url "/probe"
+    rxresp
+    expect resp.status == 503
+} -run
+
+logexpect l1 -v v1 -d 1 -g raw {
+    expect * 0 Backend_health "^be1_${s1_addr}:${s1_port} Still sick"
+} -start
+
+logexpect l1 -wait
