@@ -1,10 +1,10 @@
-use varnish::vcl::BackendRef;
+use varnish::vcl::NativeBackend;
 
 varnish::run_vtc_tests!("tests/*.vtc");
 
 pub struct DynamicBackend {
     /// A native backend created alongside this `DynamicBackend`.
-    backend: BackendRef,
+    backend: NativeBackend,
 }
 
 #[varnish::vmod(docs = "README.md")]
@@ -52,16 +52,14 @@ mod native_backend {
                 return Err("failed to create native backend");
             };
 
-            let native_backend_ref = native_backend.as_ref();
-
             Ok(Self {
-                backend: native_backend_ref.clone(),
+                backend: native_backend,
             })
         }
 
         /// Retrieve the configured native backend.
         pub fn backend(&self) -> BackendRef {
-            self.backend.clone()
+            self.backend.as_ref().clone()
         }
     }
 
